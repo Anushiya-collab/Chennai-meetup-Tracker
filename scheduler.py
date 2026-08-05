@@ -1,20 +1,17 @@
 import schedule
 import time
-import os
+import subprocess
 
 def job():
-    print("Running scraper...")
-    os.system("python scraper.py")
+    print("Running Meetup Tracker...")
 
-    print("Uploading to Google Sheets...")
-    os.system("python upload.py")
+    subprocess.run(["python", "scraper.py"])
+    subprocess.run(["python", "upload.py"])
 
-    print("Update completed!")
+    print("Google Sheet Updated!")
 
 # Run every 1 hour
 schedule.every(1).hours.do(job)
-
-print("Scheduler started... Press Ctrl+C to stop.")
 
 # Run once immediately
 job()

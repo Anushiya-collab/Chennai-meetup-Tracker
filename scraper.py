@@ -2,11 +2,23 @@ from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
 import csv
 import time
 
+# -----------------------------
+# Chrome Options (Works on GitHub Actions and Local PC)
+# -----------------------------
+options = Options()
+options.add_argument("--headless=new")
+options.add_argument("--no-sandbox")
+options.add_argument("--disable-dev-shm-usage")
+
 # Launch Chrome
-driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
+driver = webdriver.Chrome(
+    service=Service(ChromeDriverManager().install()),
+    options=options
+)
 
 # Open Meetup Chennai page
 driver.get("https://www.meetup.com/find/?location=Chennai")
@@ -28,7 +40,7 @@ for card in cards:
 
         lines = text.split("\n")
 
-        # Ignore small links
+        # Ignore very small links
         if len(lines) < 2:
             continue
 
@@ -38,7 +50,7 @@ for card in cards:
         host = ""
         venue = "Chennai"
 
-        # Try to identify date and host
+        # Identify host and date
         for line in lines:
             lower = line.lower()
 
@@ -46,8 +58,8 @@ for card in cards:
                 host = line.replace("by", "").strip()
 
             elif any(month in lower for month in [
-                "jan","feb","mar","apr","may","jun",
-                "jul","aug","sep","oct","nov","dec"
+                "jan", "feb", "mar", "apr", "may", "jun",
+                "jul", "aug", "sep", "oct", "nov", "dec"
             ]):
                 date = line
 
@@ -64,6 +76,7 @@ for card in cards:
     except Exception:
         pass
 
+# Close browser
 driver.quit()
 
 # Remove duplicates
@@ -79,7 +92,6 @@ for row in meetups:
 
 # Save CSV
 with open("meetups.csv", "w", newline="", encoding="utf-8") as file:
-
     writer = csv.writer(file)
 
     writer.writerow([
