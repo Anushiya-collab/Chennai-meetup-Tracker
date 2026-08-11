@@ -1,145 +1,91 @@
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.common.by import By
 import csv
 import time
 
-# -----------------------------
-# Chrome Options
-# -----------------------------
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
+
 options = Options()
+
 options.add_argument("--headless=new")
 options.add_argument("--no-sandbox")
 options.add_argument("--disable-dev-shm-usage")
-options.add_argument("--disable-gpu")
-options.add_argument("--window-size=1920,1080")
 
-driver = webdriver.Chrome(
-    service=Service(ChromeDriverManager().install()),
-    options=options
-)
+driver = webdriver.Chrome(options=options)
 
 driver.get("https://www.meetup.com/find/?location=Chennai")
+
 time.sleep(10)
 
-cards = driver.find_elements(By.TAG_NAME, "a")
+cards = driver.find_elements(By.CSS_SELECTOR, 'a[data-event-label="Event Card"]')
 
 meetups = []
-seen = set()
-
-# Words we don't want as titles
-bad_words = [
-    "waitlist",
-    "join",
-    "seat",
-    "member",
-    "attendee",
-    "more to explore",
-    "featured",
-    "sign in",
-    "log in",
-    "see all",
-    "create",
-    "organize",
-    "start a group"
-]
-
-# Cities we don't want
-bad_locations = [
-    "seattle",
-    "vancouver",
-    "bay area",
-    "san francisco",
-    "new york",
-    "los angeles",
-    "london",
-    "toronto",
-    "portland",
-    "marysville"
-]
 
 for card in cards:
 
     try:
 
-        text = card.text.strip()
+        title = card.find_element(By.TAG_NAME, "h3").text.strip()
 
-        if not text:
+        if not title:
             continue
 
-        lines = [i.strip() for i in text.split("\n") if i.strip()]
-
-        if len(lines) < 2:
+        # Ignore unwanted titles
+        if title.lower() in ["waitlist", "9 seats left"]:
             continue
 
-        title = ""
+        # Date
+        try:
+            date = card.find_element(By.TAG_NAME, "time").text.strip()
+        except:
+            date = ""
 
-        for line in lines:
-
-            lower = line.lower()
-
-            if line.startswith("$"):
-                continue
-
-            if lower.startswith("by"):
-                continue
-
-            if any(word in lower for word in bad_words):
-                continue
-
-            title = line
-            break
-
-        if title == "":
-            continue
-
-        # Skip unwanted locations
-        if any(city in title.lower() for city in bad_locations):
-            continue
-
+        # Host
         host = ""
-        date = ""
 
-        for line in lines:
+        divs = card.find_elements(By.TAG_NAME, "div")
 
-            lower = line.lower()
+        for d in divs:
 
-            if lower.startswith("by"):
-                host = line.replace("by", "").strip()
+            txt = d.text.strip()
 
-            if any(month in lower for month in [
-                "jan","feb","mar","apr","may","jun",
-                "jul","aug","sep","oct","nov","dec"
-            ]):
-                date = line
+            if txt.startswith("by "):
+                host = txt.replace("by ", "")
+                break
 
         source = card.get_attribute("href")
 
-        if not source:
-            continue
-
-        row = (
+        meetups.append([
             title,
             host,
             "Chennai",
             date,
             source
-        )
-
-        if row not in seen:
-            seen.add(row)
-            meetups.append(row)
+        ])
 
     except:
         pass
 
 driver.quit()
 
-with open("meetups.csv","w",newline="",encoding="utf-8") as f:
+# Remove duplicates
+unique = []
+seen = set()
 
-    writer = csv.writer(f)
+for row in meetups:
+
+    if tuple(row) not in seen:
+        seen.add(tuple(row))
+        unique.append(row)
+
+with open(
+    "meetups.csv",
+    "w",
+    newline="",
+    encoding="utf-8"
+) as file:
+
+    writer = csv.writer(file)
 
     writer.writerow([
         "Title",
@@ -149,6 +95,6 @@ with open("meetups.csv","w",newline="",encoding="utf-8") as f:
         "Source Link"
     ])
 
-    writer.writerows(meetups)
+    writer.writerows(unique)
 
-print("Meetups collected:",len(meetups))
+print("Meetups:", len(unique))
