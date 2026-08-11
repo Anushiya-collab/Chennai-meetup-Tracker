@@ -6,9 +6,9 @@ from selenium.webdriver.common.by import By
 import csv
 import time
 
-# ----------------------------
+# -----------------------------
 # Chrome Options
-# ----------------------------
+# -----------------------------
 options = Options()
 options.add_argument("--headless=new")
 options.add_argument("--no-sandbox")
@@ -21,67 +21,72 @@ driver = webdriver.Chrome(
     options=options
 )
 
-# ----------------------------
-# Open Meetup Chennai Page
-# ----------------------------
 driver.get("https://www.meetup.com/find/?location=Chennai")
-
 time.sleep(10)
 
-# ----------------------------
-# Get all links
-# ----------------------------
 cards = driver.find_elements(By.TAG_NAME, "a")
 
 meetups = []
+seen = set()
+
+# Words we don't want as titles
+bad_words = [
+    "waitlist",
+    "join",
+    "seat",
+    "member",
+    "attendee",
+    "more to explore",
+    "featured",
+    "sign in",
+    "log in",
+    "see all",
+    "create",
+    "organize",
+    "start a group"
+]
+
+# Cities we don't want
+bad_locations = [
+    "seattle",
+    "vancouver",
+    "bay area",
+    "san francisco",
+    "new york",
+    "los angeles",
+    "london",
+    "toronto",
+    "portland",
+    "marysville"
+]
 
 for card in cards:
 
     try:
+
         text = card.text.strip()
 
-        if text == "":
+        if not text:
             continue
 
-        lines = [line.strip() for line in text.split("\n") if line.strip()]
+        lines = [i.strip() for i in text.split("\n") if i.strip()]
 
         if len(lines) < 2:
             continue
 
-        # ----------------------------
-        # Find Title
-        # ----------------------------
         title = ""
 
         for line in lines:
 
             lower = line.lower()
 
-            # Skip prices
             if line.startswith("$"):
                 continue
 
-            # Skip host line
             if lower.startswith("by"):
                 continue
 
-            # Skip unwanted text
-            if "member" in lower:
-                continue
-
-            if "attendee" in lower:
-                continue
-
-            if "seat" in lower:
-                continue
-
-            if lower == "waitlist":
-                continue
-
-            if lower == "join":
-                continue
-
-            if "rsvp" in lower:
+            if any(word in lower for word in bad_words):
                 continue
 
             title = line
@@ -90,12 +95,12 @@ for card in cards:
         if title == "":
             continue
 
-        # ----------------------------
-        # Find Host & Date
-        # ----------------------------
+        # Skip unwanted locations
+        if any(city in title.lower() for city in bad_locations):
+            continue
+
         host = ""
         date = ""
-        venue = "Chennai"
 
         for line in lines:
 
@@ -104,7 +109,7 @@ for card in cards:
             if lower.startswith("by"):
                 host = line.replace("by", "").strip()
 
-            elif any(month in lower for month in [
+            if any(month in lower for month in [
                 "jan","feb","mar","apr","may","jun",
                 "jul","aug","sep","oct","nov","dec"
             ]):
@@ -112,43 +117,29 @@ for card in cards:
 
         source = card.get_attribute("href")
 
-        # Skip empty links
-        if source is None:
+        if not source:
             continue
 
-        meetups.append([
+        row = (
             title,
             host,
-            venue,
+            "Chennai",
             date,
             source
-        ])
+        )
 
-    except Exception:
+        if row not in seen:
+            seen.add(row)
+            meetups.append(row)
+
+    except:
         pass
 
 driver.quit()
 
-# ----------------------------
-# Remove Duplicates
-# ----------------------------
-unique = []
-seen = set()
+with open("meetups.csv","w",newline="",encoding="utf-8") as f:
 
-for row in meetups:
-
-    key = tuple(row)
-
-    if key not in seen:
-        seen.add(key)
-        unique.append(row)
-
-# ----------------------------
-# Save CSV
-# ----------------------------
-with open("meetups.csv", "w", newline="", encoding="utf-8") as file:
-
-    writer = csv.writer(file)
+    writer = csv.writer(f)
 
     writer.writerow([
         "Title",
@@ -158,10 +149,6 @@ with open("meetups.csv", "w", newline="", encoding="utf-8") as file:
         "Source Link"
     ])
 
-    writer.writerows(unique)
+    writer.writerows(meetups)
 
-print("===================================")
-print("Meetups collected successfully!")
-print("Saved as meetups.csv")
-print("Total Meetups:", len(unique))
-print("===================================")
+print("Meetups collected:",len(meetups))
