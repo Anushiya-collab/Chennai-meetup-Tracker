@@ -1,20 +1,37 @@
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By
 import csv
 import time
 
-# Launch Chrome
-driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
+# ----------------------------
+# Chrome Options (Works on GitHub Actions)
+# ----------------------------
+options = Options()
+options.add_argument("--headless=new")
+options.add_argument("--no-sandbox")
+options.add_argument("--disable-dev-shm-usage")
+options.add_argument("--disable-gpu")
+options.add_argument("--window-size=1920,1080")
 
+driver = webdriver.Chrome(
+    service=Service(ChromeDriverManager().install()),
+    options=options
+)
+
+# ----------------------------
 # Open Meetup Chennai page
+# ----------------------------
 driver.get("https://www.meetup.com/find/?location=Chennai")
 
 # Wait for page to load
 time.sleep(10)
 
-# Get all links on the page
+# ----------------------------
+# Collect all links
+# ----------------------------
 cards = driver.find_elements(By.TAG_NAME, "a")
 
 meetups = []
@@ -26,30 +43,47 @@ for card in cards:
         if text == "":
             continue
 
-        lines = text.split("\n")
+        lines = [line.strip() for line in text.split("\n") if line.strip()]
 
-        # Ignore small links
         if len(lines) < 2:
             continue
 
-        # -------------------------------
-        # FIX: Skip price if it appears first
-        # -------------------------------
-        title = lines[0].strip()
+        # ----------------------------
+        # Find Title
+        # ----------------------------
+        title = ""
 
-        if title.startswith("$") and len(lines) > 1:
-            title = lines[1].strip()
+        for line in lines:
 
-        # Skip if title is still a price
-        if title.startswith("$"):
+            # Skip prices
+            if line.startswith("$"):
+                continue
+
+            # Skip unwanted text
+            if line.lower().startswith("by"):
+                continue
+
+            if "member" in line.lower():
+                continue
+
+            if "attendee" in line.lower():
+                continue
+
+            title = line
+            break
+
+        if title == "":
             continue
 
-        date = ""
+        # ----------------------------
+        # Find Host & Date
+        # ----------------------------
         host = ""
+        date = ""
         venue = "Chennai"
 
-        # Try to identify date and host
         for line in lines:
+
             lower = line.lower()
 
             if lower.startswith("by"):
@@ -76,18 +110,23 @@ for card in cards:
 
 driver.quit()
 
-# Remove duplicates
+# ----------------------------
+# Remove Duplicates
+# ----------------------------
 unique = []
 seen = set()
 
 for row in meetups:
+
     key = tuple(row)
 
     if key not in seen:
         seen.add(key)
         unique.append(row)
 
+# ----------------------------
 # Save CSV
+# ----------------------------
 with open("meetups.csv", "w", newline="", encoding="utf-8") as file:
 
     writer = csv.writer(file)
