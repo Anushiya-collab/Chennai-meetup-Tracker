@@ -7,7 +7,7 @@ import csv
 import time
 
 # ----------------------------
-# Chrome Options (Works on GitHub Actions)
+# Chrome Options
 # ----------------------------
 options = Options()
 options.add_argument("--headless=new")
@@ -22,21 +22,21 @@ driver = webdriver.Chrome(
 )
 
 # ----------------------------
-# Open Meetup Chennai page
+# Open Meetup Chennai Page
 # ----------------------------
 driver.get("https://www.meetup.com/find/?location=Chennai")
 
-# Wait for page to load
 time.sleep(10)
 
 # ----------------------------
-# Collect all links
+# Get all links
 # ----------------------------
 cards = driver.find_elements(By.TAG_NAME, "a")
 
 meetups = []
 
 for card in cards:
+
     try:
         text = card.text.strip()
 
@@ -55,18 +55,33 @@ for card in cards:
 
         for line in lines:
 
+            lower = line.lower()
+
             # Skip prices
             if line.startswith("$"):
                 continue
 
+            # Skip host line
+            if lower.startswith("by"):
+                continue
+
             # Skip unwanted text
-            if line.lower().startswith("by"):
+            if "member" in lower:
                 continue
 
-            if "member" in line.lower():
+            if "attendee" in lower:
                 continue
 
-            if "attendee" in line.lower():
+            if "seat" in lower:
+                continue
+
+            if lower == "waitlist":
+                continue
+
+            if lower == "join":
+                continue
+
+            if "rsvp" in lower:
                 continue
 
             title = line
@@ -96,6 +111,10 @@ for card in cards:
                 date = line
 
         source = card.get_attribute("href")
+
+        # Skip empty links
+        if source is None:
+            continue
 
         meetups.append([
             title,
